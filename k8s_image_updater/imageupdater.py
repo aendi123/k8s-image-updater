@@ -15,9 +15,9 @@ def run(args):
         all_yaml_files = list_all_yaml_files(path)
 
     supported_yaml_files = list_supported_yaml_files(all_yaml_files)
+    supported_yaml_files_with_images = get_images_of_supported_yaml_files(supported_yaml_files)
 
-    for yaml_file in supported_yaml_files:
-        print(yaml_file.name)
+    print(supported_yaml_files_with_images)
 
 
 def list_all_yaml_files(path, exclude=''):
@@ -27,16 +27,16 @@ def list_all_yaml_files(path, exclude=''):
         file = file.resolve()
         if not exclude == '':
             if not re.match(exclude, str(file)):
-                all_yaml_files.append(file)
+                all_yaml_files.append(Path(file))
         else:
-            all_yaml_files.append(file)
+            all_yaml_files.append(Path(file))
     for file in path.rglob('*.yml'):
         file = file.resolve()
         if not exclude == '':
             if not re.match(exclude, str(file)):
-                all_yaml_files.append(file)
+                all_yaml_files.append(Path(file))
         else:
-            all_yaml_files.append(file)
+            all_yaml_files.append(Path(file))
 
     return all_yaml_files
 
@@ -50,11 +50,30 @@ def list_supported_yaml_files(yaml_files):
             for yaml_data in all_yamls:
                 try: 
                     if re.match(SUPPORTED_K8S_TYPES, yaml_data['kind']):
-                        supported_yaml_files.append(yaml_file)
+                        supported_yaml_files.append(Path(yaml_file.name))
                 except (KeyError, TypeError):
                     pass
     
     return supported_yaml_files
+
+
+def get_images_of_supported_yaml_files(supported_yaml_files):
+    supported_yaml_files_with_images = {}
+
+    for supported_yaml_file in supported_yaml_files:
+        with open(supported_yaml_file, 'r') as supported_yaml_file:
+            all_yamls = yaml.safe_load_all(supported_yaml_file)
+            for yaml_data in all_yamls:
+                    try: 
+                        if re.match(SUPPORTED_K8S_TYPES, yaml_data['kind']):
+                            supported_yaml_files_with_images[Path(supported_yaml_file.name)] = []
+                            containers = yaml_data['spec']['template']['spec']['containers']
+                            for container in containers:
+                                supported_yaml_files_with_images[Path(supported_yaml_file.name)].append(container['image'])
+                    except (KeyError, TypeError):
+                        pass
+
+    return supported_yaml_files_with_images
 
 
 def get_parser():
