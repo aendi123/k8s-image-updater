@@ -18,6 +18,7 @@ def run(args):
     supported_yaml_files_with_images = get_images_of_supported_yaml_files(supported_yaml_files)
 
     print(supported_yaml_files_with_images)
+    get_newest_images(supported_yaml_files_with_images)
 
 
 def list_all_yaml_files(path, exclude=''):
@@ -74,6 +75,14 @@ def get_images_of_supported_yaml_files(supported_yaml_files):
                         pass
 
     return supported_yaml_files_with_images
+
+
+def get_newest_images(supported_yaml_files_with_images):
+    for file in supported_yaml_files_with_images.keys():
+        print(f'Path: {file}')
+        for image in supported_yaml_files_with_images[file]:
+            print(f'Image: {image}')
+        print()
 
 
 def get_parser():
