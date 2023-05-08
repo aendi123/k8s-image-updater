@@ -1,5 +1,6 @@
 from pathlib import Path
 from helpers.image import Image
+from helpers.file import File
 
 import argparse
 import re
@@ -17,10 +18,9 @@ def run(args):
         all_yaml_files = list_all_yaml_files(path)
 
     supported_yaml_files = list_supported_yaml_files(all_yaml_files)
-    supported_yaml_files_with_images = get_images_of_supported_yaml_files(supported_yaml_files)
+    get_images_of_supported_yaml_files(supported_yaml_files)
 
-    print(supported_yaml_files_with_images)
-    get_newest_images(supported_yaml_files_with_images)
+    get_newest_images(supported_yaml_files)
 
 
 def list_all_yaml_files(path, exclude=''):
@@ -53,7 +53,7 @@ def list_supported_yaml_files(yaml_files):
             for yaml_data in all_yamls:
                 try: 
                     if re.match(SUPPORTED_K8S_TYPES, yaml_data['kind']):
-                        supported_yaml_files.append(Path(yaml_file.name))
+                        supported_yaml_files.append(File(Path(yaml_file.name)))
                 except (KeyError, TypeError):
                     pass
     
@@ -61,29 +61,23 @@ def list_supported_yaml_files(yaml_files):
 
 
 def get_images_of_supported_yaml_files(supported_yaml_files):
-    supported_yaml_files_with_images = {}
-
     for supported_yaml_file in supported_yaml_files:
-        with open(supported_yaml_file, 'r') as supported_yaml_file:
-            all_yamls = yaml.safe_load_all(supported_yaml_file)
+        with open(supported_yaml_file.path, 'r') as open_supported_yaml_file:
+            all_yamls = yaml.safe_load_all(open_supported_yaml_file)
             for yaml_data in all_yamls:
                     try: 
                         if re.match(SUPPORTED_K8S_TYPES, yaml_data['kind']):
-                            supported_yaml_files_with_images[Path(supported_yaml_file.name)] = []
                             containers = yaml_data['spec']['template']['spec']['containers']
                             for container in containers:
-                                supported_yaml_files_with_images[Path(supported_yaml_file.name)].append(container['image'])
+                                supported_yaml_file.addImage(Image((container['image'])))
                     except (KeyError, TypeError):
                         pass
 
-    return supported_yaml_files_with_images
 
-
-def get_newest_images(supported_yaml_files_with_images):
-    for file in supported_yaml_files_with_images.keys():
-        print(f'Path: {file}')
-        for image in supported_yaml_files_with_images[file]:
-            print(f'Image: {image}')
+def get_newest_images(supported_yaml_files):
+    for file in supported_yaml_files:
+        print(f'Path: {file.path}')
+        file.printImages()
         print()
 
 
