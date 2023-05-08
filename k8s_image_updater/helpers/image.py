@@ -7,9 +7,10 @@ class Image:
             self.registry = image[0]
             self.imagename = '/'.join(image[1:-1])
             self.tag = image[-1]
+            self.newesttag = ""
         else:
             raise Exception("Not a valid image name")
         
     
     def print(self):
-        print(f"Registry: {self.registry}, Imagename: {self.imagename}, Tag: {self.tag}")
+        print(f"Registry: {self.registry}, Imagename: {self.imagename}, Tag: {self.tag}, Newest Tag: {self.newesttag}")
