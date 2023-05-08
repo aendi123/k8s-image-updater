@@ -79,7 +79,7 @@ def get_newest_images(supported_yaml_files):
     for file in supported_yaml_files:
         for image in file.images:
             newesttag = os.popen(f'regctl tag ls {image.registry}/{image.imagename}').read()
-            image.newesttag = newesttag.split('\n', 1)[0]
+            image.newesttag = newesttag.split('\n', -1)[-2]
         print(f'Path: {file.path}')
         file.printImages()
         print()
