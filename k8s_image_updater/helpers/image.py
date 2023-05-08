@@ -9,3 +9,7 @@ class Image:
             self.tag = image[-1]
         else:
             raise Exception("Not a valid image name")
+        
+    
+    def print(self):
+        print(f"Registry: {self.registry}, Imagename: {self.imagename}, Tag: {self.tag}")

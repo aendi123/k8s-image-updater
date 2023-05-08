@@ -13,4 +13,4 @@ class File:
 
     def printImages(self):
         for image in self.images:
-            print(f"Registry: {image.registry}, Imagename: {image.imagename}, Tag: {image.tag}")
+            image.print()
