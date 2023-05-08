@@ -1,6 +1,10 @@
+import json
 from pathlib import Path
+
+import requests
 from helpers.image import Image
 from helpers.file import File
+from helpers.registrylogin import RegistryLogin
 
 import argparse
 import re
@@ -11,6 +15,15 @@ SUPPORTED_K8S_TYPES='Deployment|DaemonSet|StatefulSet'
 def run(args):
     path = Path(args.path)
     path = path.resolve()
+
+    registrylogins = []
+    if args.dockerconfigjson:
+        dockerconfigjson = Path(args.dockerconfigjson)
+        dockerconfigjson = dockerconfigjson.resolve()
+        with open(dockerconfigjson, 'r') as dockerconfigjson:
+            content = json.loads(dockerconfigjson.read())
+            for registry in content['auths']:
+                registrylogins.append(RegistryLogin(registry, content['auths'][registry]['auth']))
 
     if args.exclude:
         all_yaml_files = list_all_yaml_files(path, args.exclude)
@@ -78,6 +91,16 @@ def get_newest_images(supported_yaml_files):
     for file in supported_yaml_files:
         print(f'Path: {file.path}')
         file.printImages()
+        for image in file.images:
+            if (image.registry == "docker.io"):
+                registry = "hub.docker.com"
+            else:
+                registry = image.registry
+            tags = requests.get(f"https://{registry}/v2/repositories/{image.imagename}/tags/?page_size=1000")
+            tags.raise_for_status()
+            tags.encoding = tags.apparent_encoding
+            tags = tags.json()
+            print(tags)
         print()
 
 
@@ -85,6 +108,7 @@ def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs='?', default=Path.cwd(), help='path to search for YAML files')
     parser.add_argument('-e', '--exclude', action='store', help='provide regex pattern to exclude while searching for YAML files')
+    parser.add_argument('-c', '--dockerconfigjson', action='store', help='file containing docker config to login into private registries')
     return parser
 
 
