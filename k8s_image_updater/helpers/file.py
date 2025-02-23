@@ -14,3 +14,4 @@ class File:
     def printImages(self):
         for image in self.images:
             image.print()
+        print()
