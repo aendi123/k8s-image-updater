@@ -30,6 +30,7 @@ def run(args):
     supported_yaml_files = list_supported_yaml_files(all_yaml_files)
     get_images_of_supported_yaml_files(supported_yaml_files, image_regex_matches)
 
+    write_new_yaml_files(supported_yaml_files)
     
 
 def list_all_yaml_files(path, exclude=''):
@@ -108,6 +109,25 @@ def get_newest_tag(image, image_regex_matches):
         
     tags = natsorted(tags)
     return tags[-1]
+
+
+def write_new_yaml_files(supported_yaml_files):
+    for supported_yaml_file in supported_yaml_files:
+        with open(supported_yaml_file.path, 'r') as open_supported_yaml_file:
+            all_yamls = list(yaml.safe_load_all(open_supported_yaml_file))
+        
+        for yaml_data in all_yamls:
+            try:
+                containers = yaml_data['spec']['template']['spec']['containers']
+                for container in containers:
+                    for image in supported_yaml_file.images:
+                        if container['image'] == f'{image.registry}/{image.imagename}:{image.tag}':
+                            container['image'] = f'{image.registry}/{image.imagename}:{image.newesttag}'
+            except (KeyError, TypeError):
+                pass
+    
+        with open(supported_yaml_file.path, 'w') as open_supported_yaml_file:
+            yaml.safe_dump_all(all_yamls, open_supported_yaml_file, sort_keys=False, default_flow_style=False)
 
 
 def get_parser():
