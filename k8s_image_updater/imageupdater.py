@@ -1,5 +1,6 @@
 from helpers.file import File
 from helpers.image import Image
+from natsort import natsorted
 from pathlib import Path
 
 import argparse
@@ -93,7 +94,6 @@ def get_images_of_supported_yaml_files(supported_yaml_files, image_regex_matches
 
         print(f'Path: {supported_yaml_file.path}')
         supported_yaml_file.printImages()
-        print()
 
 
 def get_newest_tag(image, image_regex_matches):
@@ -106,7 +106,7 @@ def get_newest_tag(image, image_regex_matches):
         image_regex = re.compile(image_regex_matches[f'{image.registry}/{image.imagename}'])
         tags = [tag for tag in tags if image_regex.match(tag)]
         
-    tags.sort()
+    tags = natsorted(tags)
     return tags[-1]
 
 
