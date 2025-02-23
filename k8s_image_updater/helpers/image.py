@@ -17,3 +17,5 @@ class Image:
     
     def print(self):
         print(f"Registry: {self.registry}, Imagename: {self.imagename}, Tag: {self.tag}, Newest Tag: {self.newesttag}")
+        if self.tag != self.newesttag:
+            print('New tag available')
