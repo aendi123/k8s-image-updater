@@ -13,30 +13,30 @@ def run(args):
     path = Path(args.path)
     path = path.resolve()
 
+    if args.configcsv:
+        configcsv = Path(args.configcsv)
+        configcsv = configcsv.resolve()
+    else:
+        configcsv = path / 'imageupdater.csv'
+
     if args.exclude:
         all_yaml_files = list_all_yaml_files(path, args.exclude)
     else:
         all_yaml_files = list_all_yaml_files(path)
 
+    image_regex_matches = get_image_regexes_from_csv(configcsv)
+
     supported_yaml_files = list_supported_yaml_files(all_yaml_files)
-    get_images_of_supported_yaml_files(supported_yaml_files)
+    get_images_of_supported_yaml_files(supported_yaml_files, image_regex_matches)
 
-    get_newest_images(supported_yaml_files)
-
+    
 
 def list_all_yaml_files(path, exclude=''):
     all_yaml_files = []
 
-    for file in path.rglob('*.yaml'):
+    for file in list(path.rglob('*.yaml')) + list(path.rglob('*.yml')):
         file = file.resolve()
-        if not exclude == '':
-            if not re.match(exclude, str(file)):
-                all_yaml_files.append(Path(file))
-        else:
-            all_yaml_files.append(Path(file))
-    for file in path.rglob('*.yml'):
-        file = file.resolve()
-        if not exclude == '':
+        if exclude:
             if not re.match(exclude, str(file)):
                 all_yaml_files.append(Path(file))
         else:
@@ -61,34 +61,60 @@ def list_supported_yaml_files(yaml_files):
     return supported_yaml_files
 
 
-def get_images_of_supported_yaml_files(supported_yaml_files):
+def get_image_regexes_from_csv(csv_file):
+    image_regex_matches = {}
+
+    if not csv_file.exists():
+        print(f'WARNING: File {csv_file} does not exist. No image regexes will be used.')
+        return image_regex_matches
+    
+    with open(csv_file, 'r') as open_csv_file:
+        for line in open_csv_file:
+            image = line.strip().split(';')
+            if len(image) == 2:
+                image_regex_matches[image[0]] = image[1]
+
+    return image_regex_matches
+
+
+def get_images_of_supported_yaml_files(supported_yaml_files, image_regex_matches):
     for supported_yaml_file in supported_yaml_files:
         with open(supported_yaml_file.path, 'r') as open_supported_yaml_file:
             all_yamls = yaml.safe_load_all(open_supported_yaml_file)
             for yaml_data in all_yamls:
                     try: 
-                        if re.match(SUPPORTED_K8S_TYPES, yaml_data['kind']):
-                            containers = yaml_data['spec']['template']['spec']['containers']
-                            for container in containers:
-                                supported_yaml_file.addImage(Image((container['image'])))
+                        containers = yaml_data['spec']['template']['spec']['containers']
+                        for container in containers:
+                            image = Image((container['image']))
+                            image.setNewestTag(get_newest_tag(image, image_regex_matches))
+                            supported_yaml_file.addImage(image)
                     except (KeyError, TypeError):
                         pass
 
-
-def get_newest_images(supported_yaml_files):
-    for file in supported_yaml_files:
-        for image in file.images:
-            tags = os.popen(f'regctl tag ls {image.registry}/{image.imagename}').read().split('\n')
-            # print(tags)
-        print(f'Path: {file.path}')
-        file.printImages()
+        print(f'Path: {supported_yaml_file.path}')
+        supported_yaml_file.printImages()
         print()
+
+
+def get_newest_tag(image, image_regex_matches):
+    tags = os.popen(f'regctl tag ls {image.registry}/{image.imagename}').read().split('\n')
+
+    if tags and tags[-1] == '':
+        tags.pop()
+
+    if f'{image.registry}/{image.imagename}' in image_regex_matches:
+        image_regex = re.compile(image_regex_matches[f'{image.registry}/{image.imagename}'])
+        tags = [tag for tag in tags if image_regex.match(tag)]
+        
+    tags.sort()
+    return tags[-1]
 
 
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs='?', default=Path.cwd(), help='path to search for YAML files')
     parser.add_argument('-e', '--exclude', action='store', help='provide regex pattern to exclude while searching for YAML files')
+    parser.add_argument('-c', '--configcsv', action='store', help='provide CSV file with image names and their regex the tag has to match')
     return parser
 
 
