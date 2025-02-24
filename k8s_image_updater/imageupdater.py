@@ -21,19 +21,20 @@ def run(args):
         configcsv = path / 'imageupdater.csv'
 
     if args.exclude:
-        all_yaml_files = list_all_yaml_files(path, args.exclude)
+        all_yaml_files = get_all_yaml_files(path, args.exclude)
     else:
-        all_yaml_files = list_all_yaml_files(path)
+        all_yaml_files = get_all_yaml_files(path)
 
-    image_regex_matches = get_image_regexes_from_csv(configcsv)
+    image_regex_matches = get_image_tag_regexes_from_csv(configcsv)
 
-    supported_yaml_files = list_supported_yaml_files(all_yaml_files)
+    supported_yaml_files = filter_for_supported_yaml_files(all_yaml_files)
     get_images_of_supported_yaml_files(supported_yaml_files, image_regex_matches)
 
-    write_new_yaml_files(supported_yaml_files)
+    if args.write_newest:
+        write_yaml_files_with_newest_tag(supported_yaml_files)
     
 
-def list_all_yaml_files(path, exclude=''):
+def get_all_yaml_files(path, exclude=''):
     all_yaml_files = []
 
     for file in list(path.rglob('*.yaml')) + list(path.rglob('*.yml')):
@@ -47,23 +48,7 @@ def list_all_yaml_files(path, exclude=''):
     return all_yaml_files
 
 
-def list_supported_yaml_files(yaml_files):
-    supported_yaml_files = []
-
-    for yaml_file in yaml_files:
-        with open(yaml_file, 'r') as yaml_file:
-            all_yamls = yaml.safe_load_all(yaml_file)
-            for yaml_data in all_yamls:
-                try: 
-                    if re.match(SUPPORTED_K8S_TYPES, yaml_data['kind']):
-                        supported_yaml_files.append(File(Path(yaml_file.name)))
-                except (KeyError, TypeError):
-                    pass
-    
-    return supported_yaml_files
-
-
-def get_image_regexes_from_csv(csv_file):
+def get_image_tag_regexes_from_csv(csv_file):
     image_regex_matches = {}
 
     if not csv_file.exists():
@@ -79,6 +64,22 @@ def get_image_regexes_from_csv(csv_file):
     return image_regex_matches
 
 
+def filter_for_supported_yaml_files(yaml_files):
+    supported_yaml_files = []
+
+    for yaml_file in yaml_files:
+        with open(yaml_file, 'r') as yaml_file:
+            all_yamls = yaml.safe_load_all(yaml_file)
+            for yaml_data in all_yamls:
+                try: 
+                    if re.match(SUPPORTED_K8S_TYPES, yaml_data['kind']):
+                        supported_yaml_files.append(File(Path(yaml_file.name)))
+                except (KeyError, TypeError):
+                    pass
+    
+    return supported_yaml_files
+
+
 def get_images_of_supported_yaml_files(supported_yaml_files, image_regex_matches):
     for supported_yaml_file in supported_yaml_files:
         with open(supported_yaml_file.path, 'r') as open_supported_yaml_file:
@@ -88,7 +89,7 @@ def get_images_of_supported_yaml_files(supported_yaml_files, image_regex_matches
                         containers = yaml_data['spec']['template']['spec']['containers']
                         for container in containers:
                             image = Image((container['image']))
-                            image.setNewestTag(get_newest_tag(image, image_regex_matches))
+                            image.setNewestTag(get_newest_tag_of_image(image, image_regex_matches))
                             supported_yaml_file.addImage(image)
                     except (KeyError, TypeError):
                         pass
@@ -97,7 +98,7 @@ def get_images_of_supported_yaml_files(supported_yaml_files, image_regex_matches
         supported_yaml_file.printImages()
 
 
-def get_newest_tag(image, image_regex_matches):
+def get_newest_tag_of_image(image, image_regex_matches):
     tags = os.popen(f'regctl tag ls {image.registry}/{image.imagename}').read().split('\n')
 
     if tags and tags[-1] == '':
@@ -111,7 +112,7 @@ def get_newest_tag(image, image_regex_matches):
     return tags[-1]
 
 
-def write_new_yaml_files(supported_yaml_files):
+def write_yaml_files_with_newest_tag(supported_yaml_files):
     for supported_yaml_file in supported_yaml_files:
         with open(supported_yaml_file.path, 'r') as open_supported_yaml_file:
             all_yamls = list(yaml.safe_load_all(open_supported_yaml_file))
@@ -133,8 +134,9 @@ def write_new_yaml_files(supported_yaml_files):
 def get_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs='?', default=Path.cwd(), help='path to search for YAML files')
-    parser.add_argument('-e', '--exclude', action='store', help='provide regex pattern to exclude while searching for YAML files')
     parser.add_argument('-c', '--configcsv', action='store', help='provide CSV file with image names and their regex the tag has to match')
+    parser.add_argument('-e', '--exclude', action='store', help='provide regex pattern to exclude while searching for YAML files')
+    parser.add_argument('-w', '--write-newest', action='store_true', help='enable writing the newest tag into the YAML files')
     return parser
 
 
