@@ -32,4 +32,3 @@ dependencies:
   - xz=5.6.4=h5eee18b_1
   - yaml=0.2.5=h7b6447c_0
   - zlib=1.2.13=h5eee18b_1
-prefix: /home/andrin/anaconda3/envs/k8s-image-updater
